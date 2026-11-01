@@ -1,137 +1,160 @@
-
-import { useState } from 'react'
-
-const initialRequests = [
-  {
-    id: 1,
-    patient: 'Ahmed Khan',
-    hospital: 'City Hospital',
-    bloodGroup: 'B+',
-    component: 'Whole Blood',
-    units: 2,
-    urgency: 'Urgent',
-    requiredDate: '',
-    status: 'Pending',
-  },
-  {
-    id: 2,
-    patient: 'Sara Ali',
-    hospital: 'General Hospital',
-    bloodGroup: 'O-',
-    component: 'Red Blood Cells',
-    units: 1,
-    urgency: 'Normal',
-    requiredDate: '',
-    status: 'Approved',
-  },
-  {
-    id: 3,
-    patient: 'Usman Tariq',
-    hospital: 'Central Medical Center',
-    bloodGroup: 'A+',
-    component: 'Platelets',
-    units: 3,
-    urgency: 'Emergency',
-    requiredDate: '',
-    status: 'Pending',
-  },
-]
-
+import { useState, useEffect } from "react";
 function App() {
-  const [requests, setRequests] = useState(initialRequests)
-  const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState('All')
-  const [showForm, setShowForm] = useState(false)
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("All");
+  const [showForm, setShowForm] = useState(false);
 
   const [formData, setFormData] = useState({
-    patient: '',
-    hospital: '',
-    bloodGroup: 'A+',
-    component: 'Whole Blood',
+    patient: "",
+    hospital: "",
+    bloodGroup: "A+",
+    component: "Whole Blood",
     units: 1,
-    urgency: 'Normal',
-    requiredDate: '',
-  })
+    urgency: "Normal",
+    requiredDate: "",
+  });
 
   // Search requests and apply the selected status filter
   const filteredRequests = requests.filter((request) => {
-    const searchText = search.toLowerCase()
+    const searchText = search.toLowerCase();
 
     const matchesSearch =
       request.patient.toLowerCase().includes(searchText) ||
       request.hospital.toLowerCase().includes(searchText) ||
-      request.bloodGroup.toLowerCase().includes(searchText)
+      request.bloodGroup.toLowerCase().includes(searchText);
 
-    const matchesFilter =
-      filter === 'All' || request.status === filter
+    const matchesFilter = filter === "All" || request.status === filter;
 
-    return matchesSearch && matchesFilter
-  })
+    return matchesSearch && matchesFilter;
+  });
 
   // Dashboard statistics
   const pendingCount = requests.filter(
-    (request) => request.status === 'Pending'
-  ).length
+    (request) => request.status === "Pending",
+  ).length;
 
   const approvedCount = requests.filter(
-    (request) => request.status === 'Approved'
-  ).length
+    (request) => request.status === "Approved",
+  ).length;
 
   const issuedCount = requests.filter(
-    (request) => request.status === 'Issued'
-  ).length
+    (request) => request.status === "Issued",
+  ).length;
 
   // Update a request's status
-  function updateStatus(id, newStatus) {
-    setRequests((previousRequests) =>
-      previousRequests.map((request) =>
-        request.id === id
-          ? { ...request, status: newStatus }
-          : request
-      )
-    )
+
+  // Update a request's status in Supabase
+  async function updateStatus(id, newStatus) {
+    try {
+      const response = await fetch(
+        `http://localhost:5000/api/blood-requests/${id}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ status: newStatus }),
+        },
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to update request");
+      }
+
+      setRequests((previousRequests) =>
+        previousRequests.map((request) =>
+          request.id === id ? { ...request, status: result.status } : request,
+        ),
+      );
+    } catch (error) {
+      alert(error.message);
+    }
   }
 
   // Update form values as the user types
   function handleInputChange(event) {
-    const { name, value } = event.target
+    const { name, value } = event.target;
 
     setFormData((previousData) => ({
       ...previousData,
       [name]: value,
-    }))
+    }));
   }
 
   // Submit a new blood request
-  function handleSubmit(event) {
-    event.preventDefault()
 
-    const newRequest = {
-      id: Date.now(),
-      ...formData,
-      units: Number(formData.units),
-      status: 'Pending',
+  async function handleSubmit(event) {
+    event.preventDefault();
+
+    try {
+      const response = await fetch("http://localhost:5000/api/blood-requests", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          patient_name: formData.patient,
+          hospital_name: formData.hospital,
+          blood_group_name: formData.bloodGroup,
+          units_required: Number(formData.units),
+          urgency: formData.urgency,
+          required_date: formData.requiredDate,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to save blood request");
+      }
+
+      setRequests((previousRequests) => [result, ...previousRequests]);
+
+      setFormData({
+        patient: "",
+        hospital: "",
+        bloodGroup: "A+",
+        component: "Whole Blood",
+        units: 1,
+        urgency: "Normal",
+        requiredDate: "",
+      });
+
+      setShowForm(false);
+      setFilter("All");
+      setSearch("");
+    } catch (error) {
+      alert(error.message);
+    }
+  }
+
+  useEffect(() => {
+    async function fetchRequests() {
+      try {
+        const response = await fetch(
+          "http://localhost:5000/api/blood-requests",
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to load blood requests");
+        }
+
+        const data = await response.json();
+        setRequests(data);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
     }
 
-    setRequests((previousRequests) => [
-      newRequest,
-      ...previousRequests,
-    ])
-
-    setFormData({
-      patient: '',
-      hospital: '',
-      bloodGroup: 'A+',
-      component: 'Whole Blood',
-      units: 1,
-      urgency: 'Normal',
-      requiredDate: '',
-    })
-
-    setShowForm(false)
-    setFilter('All')
-    setSearch('')
-  }
+    fetchRequests();
+  }, []);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800">
@@ -139,9 +162,7 @@ function App() {
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
           <div>
-            <h1 className="text-2xl font-bold text-red-700">
-              BloodLink
-            </h1>
+            <h1 className="text-2xl font-bold text-red-700">BloodLink</h1>
             <p className="mt-1 text-sm text-slate-500">
               Blood Donation Management System
             </p>
@@ -149,9 +170,7 @@ function App() {
 
           <div className="hidden text-right sm:block">
             <p className="font-semibold">Blood Bank Staff</p>
-            <p className="text-sm text-slate-500">
-              Requests & Issuing
-            </p>
+            <p className="text-sm text-slate-500">Requests & Issuing</p>
           </div>
         </div>
       </header>
@@ -160,9 +179,7 @@ function App() {
         {/* Page heading */}
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-2xl font-bold">
-              Blood Requests
-            </h2>
+            <h2 className="text-2xl font-bold">Blood Requests</h2>
             <p className="mt-1 text-slate-500">
               Manage patient requests, approvals, and blood issuing.
             </p>
@@ -181,9 +198,7 @@ function App() {
           <section className="mb-8 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="mb-6 flex items-center justify-between gap-4">
               <div>
-                <h3 className="text-xl font-bold">
-                  Register Blood Request
-                </h3>
+                <h3 className="text-xl font-bold">Register Blood Request</h3>
                 <p className="mt-1 text-sm text-slate-500">
                   Enter the patient's and blood requirement details.
                 </p>
@@ -253,20 +268,13 @@ function App() {
                     onChange={handleInputChange}
                     className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
                   >
-                    {[
-                      'A+',
-                      'A-',
-                      'B+',
-                      'B-',
-                      'AB+',
-                      'AB-',
-                      'O+',
-                      'O-',
-                    ].map((group) => (
-                      <option key={group} value={group}>
-                        {group}
-                      </option>
-                    ))}
+                    {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map(
+                      (group) => (
+                        <option key={group} value={group}>
+                          {group}
+                        </option>
+                      ),
+                    )}
                   </select>
                 </div>
 
@@ -346,7 +354,7 @@ function App() {
                     id="requiredDate"
                     name="requiredDate"
                     type="date"
-                    min={new Date().toLocaleDateString('en-CA')}
+                    min={new Date().toLocaleDateString("en-CA")}
                     value={formData.requiredDate}
                     onChange={handleInputChange}
                     required
@@ -400,12 +408,12 @@ function App() {
         </section>
 
         {/* Requests table */}
+        {loading && <p className="p-4">Loading requests...</p>}
+        {error && <p className="p-4 text-red-600">{error}</p>}
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="flex flex-col gap-4 border-b border-slate-200 p-5 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h3 className="text-lg font-bold">
-                Request Records
-              </h3>
+              <h3 className="text-lg font-bold">Request Records</h3>
               <p className="mt-1 text-sm text-slate-500">
                 Search and manage blood requests.
               </p>
@@ -434,7 +442,7 @@ function App() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-left text-sm">
+            <table className="w-full min-w-225 text-left text-sm">
               <thead className="bg-slate-50 text-slate-500">
                 <tr>
                   <th className="px-5 py-4 font-semibold">Patient</th>
@@ -451,10 +459,7 @@ function App() {
 
               <tbody className="divide-y divide-slate-100">
                 {filteredRequests.map((request) => (
-                  <tr
-                    key={request.id}
-                    className="transition hover:bg-slate-50"
-                  >
+                  <tr key={request.id} className="transition hover:bg-slate-50">
                     <td className="px-5 py-4 font-semibold">
                       {request.patient}
                     </td>
@@ -466,44 +471,36 @@ function App() {
                         {request.bloodGroup}
                       </span>
                     </td>
-                    <td className="px-5 py-4">
-                      {request.component}
-                    </td>
+                    <td className="px-5 py-4">{request.component}</td>
                     <td className="px-5 py-4">{request.units}</td>
                     <td className="px-5 py-4">
                       <UrgencyBadge urgency={request.urgency} />
                     </td>
-                    <td className="px-5 py-4">
-                      {request.requiredDate || '—'}
-                    </td>
+                    <td className="px-5 py-4">{request.requiredDate || "—"}</td>
                     <td className="px-5 py-4">
                       <StatusBadge status={request.status} />
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex gap-2">
-                        {request.status === 'Pending' && (
+                        {request.status === "Pending" && (
                           <button
-                            onClick={() =>
-                              updateStatus(request.id, 'Approved')
-                            }
+                            onClick={() => updateStatus(request.id, "Approved")}
                             className="rounded-md bg-blue-50 px-3 py-2 font-medium text-blue-700 hover:bg-blue-100"
                           >
                             Approve
                           </button>
                         )}
 
-                        {request.status === 'Approved' && (
+                        {request.status === "Approved" && (
                           <button
-                            onClick={() =>
-                              updateStatus(request.id, 'Issued')
-                            }
+                            onClick={() => updateStatus(request.id, "Issued")}
                             className="rounded-md bg-green-50 px-3 py-2 font-medium text-green-700 hover:bg-green-100"
                           >
                             Mark Issued
                           </button>
                         )}
 
-                        {request.status === 'Issued' && (
+                        {request.status === "Issued" && (
                           <span className="px-2 py-2 text-slate-400">
                             Completed
                           </span>
@@ -533,12 +530,12 @@ function App() {
         </section>
 
         <p className="mt-5 text-xs text-slate-400">
-          Demo version: request records are currently stored in React state
-          and will reset when the page is refreshed.
+          Demo version: request records are currently stored in React state and
+          will reset when the page is refreshed.
         </p>
       </main>
     </div>
-  )
+  );
 }
 
 function StatCard({ title, value, description }) {
@@ -548,43 +545,43 @@ function StatCard({ title, value, description }) {
       <p className="mt-3 text-3xl font-bold">{value}</p>
       <p className="mt-2 text-sm text-slate-500">{description}</p>
     </div>
-  )
+  );
 }
 
 function StatusBadge({ status }) {
   const styles = {
-    Pending: 'bg-amber-50 text-amber-700',
-    Approved: 'bg-blue-50 text-blue-700',
-    Issued: 'bg-green-50 text-green-700',
-  }
+    Pending: "bg-amber-50 text-amber-700",
+    Approved: "bg-blue-50 text-blue-700",
+    Issued: "bg-green-50 text-green-700",
+  };
 
   return (
     <span
       className={`rounded-full px-3 py-1 text-xs font-semibold ${
-        styles[status] || 'bg-slate-100 text-slate-600'
+        styles[status] || "bg-slate-100 text-slate-600"
       }`}
     >
       {status}
     </span>
-  )
+  );
 }
 
 function UrgencyBadge({ urgency }) {
   const styles = {
-    Normal: 'bg-slate-100 text-slate-600',
-    Urgent: 'bg-orange-50 text-orange-700',
-    Emergency: 'bg-red-50 text-red-700',
-  }
+    Normal: "bg-slate-100 text-slate-600",
+    Urgent: "bg-orange-50 text-orange-700",
+    Emergency: "bg-red-50 text-red-700",
+  };
 
   return (
     <span
       className={`rounded-full px-3 py-1 text-xs font-semibold ${
-        styles[urgency] || 'bg-slate-100 text-slate-600'
+        styles[urgency] || "bg-slate-100 text-slate-600"
       }`}
     >
       {urgency}
     </span>
-  )
+  );
 }
 
-export default App
+export default App;
