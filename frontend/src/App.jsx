@@ -1,3 +1,4 @@
+import { apiFetch } from "./lib/api";
 import { useState, useEffect } from "react";
 function App() {
   const [requests, setRequests] = useState([]);
@@ -49,8 +50,7 @@ function App() {
   // Update a request's status in Supabase
   async function updateStatus(id, newStatus) {
     try {
-      const response = await fetch(
-        `http://localhost:5000/api/blood-requests/${id}`,
+      const response = await apiFetch(`/api/blood-requests/${id}`,
         {
           method: "PATCH",
           headers: {
@@ -92,7 +92,7 @@ function App() {
     event.preventDefault();
 
     try {
-      const response = await fetch("http://localhost:5000/api/blood-requests", {
+      const response = await apiFetch("/api/blood-requests", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -136,9 +136,7 @@ function App() {
   useEffect(() => {
     async function fetchRequests() {
       try {
-        const response = await fetch(
-          "http://localhost:5000/api/blood-requests",
-        );
+        const response = await apiFetch("/api/blood-requests");
 
         if (!response.ok) {
           throw new Error("Failed to load blood requests");
@@ -159,7 +157,7 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800">
       {/* Header */}
-      <header className="border-b border-slate-200 bg-white">
+      
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
           <div>
             <h1 className="text-2xl font-bold text-red-700">BloodLink</h1>
@@ -173,7 +171,7 @@ function App() {
             <p className="text-sm text-slate-500">Requests & Issuing</p>
           </div>
         </div>
-      </header>
+    
 
       <main className="mx-auto max-w-7xl px-6 py-8">
         {/* Page heading */}
